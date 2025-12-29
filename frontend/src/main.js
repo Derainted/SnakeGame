@@ -5,61 +5,16 @@ import { Game } from "./logic/Game.js";
 import { Renderer } from "./ui/Renderer.js";
 import { Input } from "./ui/Input.js";
 import { MultiplayerManager } from "./logic/MultiplayerManager.js";
+import { UIManager } from "./ui/UiManager.js";
 
 const canvas = document.getElementById("gameCanvas");
-
 const board = new Board(20, 20, 30);
 const game = new Game(board);
 const renderer = new Renderer(canvas, board);
 new Input(game);
 
-// Initialize multiplayer
 const multiplayer = new MultiplayerManager(game);
-
-// Example UI: add buttons dynamically
-const hostButton = document.createElement("button");
-hostButton.textContent = "Host Game";
-document.body.appendChild(hostButton);
-
-const joinInput = document.createElement("input");
-joinInput.placeholder = "Session ID";
-document.body.appendChild(joinInput);
-
-const joinButton = document.createElement("button");
-joinButton.textContent = "Join Game";
-document.body.appendChild(joinButton);
-
-// Button events
-hostButton.addEventListener("click", async () => {
-  const playerName = prompt("Enter your name", "Player");
-  if (!playerName) return;
-
-  try {
-    const session = await multiplayer.host(playerName);
-    console.log("HOSTED SESSION:", session);
-    alert(`Session created: ${session}`);
-  } catch (e) {
-    console.error("Host failed:", e);
-  }
-});
-
-
-joinButton.addEventListener("click", async () => {
-  const sessionId = joinInput.value.trim();
-  if (!sessionId) return alert("Enter a session ID");
-
-  const playerName = prompt("Enter your name", "Player");
-  if (!playerName) return;
-
-  try {
-    const session = await multiplayer.join(sessionId, playerName);
-    console.log("JOINED SESSION:", session);
-    alert(`Joined session: ${session}`);
-  } catch (e) {
-    console.error("Join failed:", e);
-  }
-});
-
+const ui = new UIManager(multiplayer); // handle all host/join DOM
 
 // Override update to send local snake each tick
 const originalUpdate = game.update.bind(game);
@@ -71,8 +26,8 @@ game.update = function () {
   }
 };
 
-
-// Your existing render loop stays exactly the same
+// Start game and render loop
+game.start();
 function loop() {
   renderer.clear();
   renderer.drawFood(game.food);
@@ -83,6 +38,4 @@ function loop() {
 
   requestAnimationFrame(loop);
 }
-
-game.start();
 loop();

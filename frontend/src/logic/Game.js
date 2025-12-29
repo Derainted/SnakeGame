@@ -1,32 +1,37 @@
 import { Snake } from "./Snake.js";
 import { Food } from "./Food.js";
 import { Scoreboard } from "../ui/Scoreboard.js";
+import { Collision } from "./Collision.js";
 
 export class Game {
   constructor(board) {
     this.board = board;
 
-    this.snakes = {}; // key = snake.id, value = Snake instance
+    this.snakes = {};
 
-    const snake1 = new Snake(5, 10, "local", "Idris");
-    const snake2 = new Snake(15, 10, "remote", "Player");
+    // Local snakes
+    const snake1 = new Snake(5, 10, crypto.randomUUID(), "Player1");
 
     this.snakes[snake1.id] = snake1;
-    this.snakes[snake2.id] = snake2;
+
+    // IDs for easier reference
+    this.localSnakeId = snake1.id; // Arrow keys
+
+    // Collision helper
+    this.collision = new Collision(this.board, this.snakes);
 
     this.running = false;
     this.tickRate = 150; // ms
     this.intervalId = null;
 
-    this.matchDuration = 10_000; // 60 seconds
+    this.matchDuration = 20_000; // 20 seconds for testing
     this.timeLeft = this.matchDuration;
     this.gameOver = false;
     this.lastTickTime = Date.now();
 
     this.score = 0;
-
     this.scoreboard = new Scoreboard();
-    this.playerName = "Player"; // temporary, later from UI
+    this.playerName = "Player";
 
     const spawn = this.getRandomSpawnPosition();
     this.food = new Food(spawn.x, spawn.y);
@@ -63,6 +68,7 @@ export class Game {
       return;
     }
 
+    // Send local snake via multiplayer if manager exists
     if (this.multiplayerManager) {
       this.multiplayerManager.sendSnake("Player");
     }
@@ -74,16 +80,17 @@ export class Game {
 
     // Wall & self collision
     for (const snake of Object.values(this.snakes)) {
-      const head = snake.segments[0];
-
-      if (!this.board.isInside(head) || this.hasSelfCollision(snake)) {
+      if (
+        this.collision.hasWallCollision(snake) ||
+        this.collision.hasSelfCollision(snake)
+      ) {
         const spawn = this.getRandomSpawnPosition();
         snake.reset(spawn.x, spawn.y);
       }
     }
 
     // Snake vs snake collision
-    const deadSnake = this.getSnakeCollision();
+    const deadSnake = this.collision.getSnakeCollision();
     if (deadSnake) {
       const spawn = this.getRandomSpawnPosition();
       deadSnake.reset(spawn.x, spawn.y);
@@ -122,7 +129,6 @@ export class Game {
 
   respawnFood() {
     let position;
-
     do {
       position = this.getRandomSpawnPosition();
     } while (
@@ -130,7 +136,6 @@ export class Game {
         snake.segments.some((s) => s.x === position.x && s.y === position.y)
       )
     );
-
     this.food.setPosition(position.x, position.y);
   }
 
@@ -139,32 +144,5 @@ export class Game {
       x: Math.floor(Math.random() * (this.board.cols - 2)) + 1,
       y: Math.floor(Math.random() * (this.board.rows - 2)) + 1,
     };
-  }
-
-  hasSelfCollision(snake) {
-    const [head, ...body] = snake.segments;
-    return body.some((s) => s.x === head.x && s.y === head.y);
-  }
-
-  getSnakeCollision() {
-    for (const snake of Object.values(this.snakes)) {
-      const head = snake.segments[0];
-
-      for (const other of Object.values(this.snakes)) {
-        const body = other.segments;
-
-        // Head into another snake's body OR head
-        for (let i = 0; i < body.length; i++) {
-          // Skip own head
-          if (snake === other && i === 0) continue;
-
-          if (head.x === body[i].x && head.y === body[i].y) {
-            return snake; // THIS snake dies
-          }
-        }
-      }
-    }
-
-    return null;
   }
 }

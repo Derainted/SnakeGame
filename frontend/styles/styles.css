@@ -1,6 +1,24 @@
 body {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: rgb(69, 69, 69);
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  background-color: rgb(69, 69, 69);
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* center canvas and controls horizontally */
+}
+
+#uiControls {
+  margin: 10px 0;
+}
+
+#uiControls button,
+#uiControls input {
+  margin: 0 5px;
+  padding: 5px 10px;
+  font-size: 14px;
+}
+
+#gameCanvas {
+  border: 2px solid #8d1d1d;
 }

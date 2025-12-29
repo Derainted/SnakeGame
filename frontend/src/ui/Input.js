@@ -9,7 +9,7 @@ export class Input {
         return;
       }
 
-      const snake = this.game.snakes["local"];
+      const snake = this.game.snakes[this.game.localSnakeId];
       if (!snake) return;
 
       switch (e.key) {
