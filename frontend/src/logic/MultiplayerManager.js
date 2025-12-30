@@ -1,25 +1,18 @@
 import { MultiplayerApi } from "../multiplayer/MultiplayerApi.js";
 
+import { Snake } from "./Snake.js";
+
 export class MultiplayerManager {
-  constructor(game, serverUrl = null) {
+  constructor(game, localSnakeId, serverUrl = null) {
     this.game = game;
+    this.localSnakeId = localSnakeId; // ✅ store the local snake ID
     this.isConnectedToSession = false;
 
     // Use provided server or default
     this.api = new MultiplayerApi(
-      `ws${location.protocol === "https:" ? "s" : ""}://${
-        location.host
-      }/net`
+      `ws${location.protocol === "https:" ? "s" : ""}://${location.host}/net`
     );
 
-    console.log(
-      "Connecting to multiplayer at:",
-      `ws${location.protocol === "https:" ? "s" : ""}://${
-        location.host
-      }/net`
-    );
-
-    this.localSnakeId = crypto.randomUUID(); // unique ID for this client
     this.isHost = false;
 
     this.setupListeners();
@@ -27,35 +20,20 @@ export class MultiplayerManager {
 
   setupListeners() {
     this.api.listen((event, messageId, clientId, data) => {
-      console.log("MP EVENT:", event, {
-        messageId,
-        clientId,
-        data,
-      });
-
-      if (event === "joined") {
-        console.log("Player joined session:", data);
-        return;
-      }
-
       if (event !== "game") return;
 
       const { snakeId, segments, name } = data;
       if (!snakeId || !segments) return;
 
-      // Ignore own snake
+      // Ignore your own snake updates
       if (snakeId === this.localSnakeId) return;
 
-      // Create remote snake if missing
+      // Only create a remote snake if it doesn't exist yet
       if (!this.game.snakes[snakeId]) {
-        const first = segments[0];
         const SnakeClass = Object.values(this.game.snakes)[0]?.constructor;
+        if (!SnakeClass) return;
 
-        if (!SnakeClass) {
-          console.error("No local snake exists yet!");
-          return;
-        }
-
+        const first = segments[0];
         this.game.snakes[snakeId] = new SnakeClass(
           first.x,
           first.y,
@@ -64,16 +42,45 @@ export class MultiplayerManager {
         );
       }
 
+      // Update remote snake segments
       this.game.snakes[snakeId].segments = segments;
     });
   }
 
-  // Host a new session
+  // Spawn local snake
+  createLocalSnake(playerName = "Player") {
+    const spawnX = Math.floor(this.game.board.cols / 2);
+    const spawnY = Math.floor(this.game.board.rows / 2);
+
+    const snake = new Snake(spawnX, spawnY, this.localSnakeId, playerName);
+    this.game.snakes[this.localSnakeId] = snake;
+  }
+
   host(playerName) {
     return this.api.host().then((res) => {
       this.isHost = true;
       this.isConnectedToSession = true;
+
+      // Spawn local snake
+      this.createLocalSnake(playerName);
+
+      // Send initial snake state
       this.sendSnake(playerName);
+
+      // Listen for new joiners to immediately send all snakes
+      this.api.listen((event, messageId, clientId, data) => {
+        if (event !== "joined") return;
+
+        // New player joined → send all existing snakes to them
+        for (const snake of Object.values(this.game.snakes)) {
+          this.api.game({
+            snakeId: snake.id,
+            segments: snake.segments,
+            name: snake.name,
+          });
+        }
+      });
+
       return res.session;
     });
   }
@@ -81,14 +88,22 @@ export class MultiplayerManager {
   join(sessionId, playerName) {
     return this.api.join(sessionId, { name: playerName }).then((res) => {
       this.isConnectedToSession = true;
+
+      // Spawn local snake
+      this.createLocalSnake(playerName);
+
+      // Send local snake state
       this.sendSnake(playerName);
+
+      // Listen for all incoming snakes (already in setupListeners)
+      // They will appear immediately when host sends them
+
       return res.session;
     });
   }
 
-  // Send local snake data every tick
   sendSnake(playerName = "Player") {
-    const localSnake = Object.values(this.game.snakes)[0];
+    const localSnake = this.game.snakes[this.localSnakeId];
     if (!localSnake) return;
 
     this.api.game({

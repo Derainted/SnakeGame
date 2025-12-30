@@ -9,14 +9,6 @@ export class Game {
 
     this.snakes = {};
 
-    // Local snakes
-    const snake1 = new Snake(5, 10, crypto.randomUUID(), "Player1");
-
-    this.snakes[snake1.id] = snake1;
-
-    // IDs for easier reference
-    this.localSnakeId = snake1.id; // Arrow keys
-
     // Collision helper
     this.collision = new Collision(this.board, this.snakes);
 
